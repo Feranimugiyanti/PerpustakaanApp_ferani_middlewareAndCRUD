@@ -3,71 +3,72 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Providers\RouteServiceProvider;
 use App\Models\User;
-use Illuminate\Foundation\Auth\RegistersUsers;
-use Illuminate\Support\Facades\Hash;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class RegisterController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Register Controller
-    |--------------------------------------------------------------------------
-    |
-    | This controller handles the registration of new users as well as their
-    | validation and creation. By default this controller uses a trait to
-    | provide this functionality without requiring any additional code.
-    |
-    */
-
-    use RegistersUsers;
-
-    /**
-     * Where to redirect users after registration.
-     *
-     * @var string
-     */
-    protected $redirectTo = RouteServiceProvider::HOME;
-
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
-    public function __construct()
+    public function create(Request $request)
     {
-        $this->middleware('guest');
-    }
+        $body = $request->only(
+            'username',
+            'password',
+            'full_name',
+            'email',
+            'phone_number'
+        );
 
-    /**
-     * Get a validator for an incoming registration request.
-     *
-     * @param  array  $data
-     * @return \Illuminate\Contracts\Validation\Validator
-     */
-    protected function validator(array $data)
-    {
-        return Validator::make($data, [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        $response = array();
+        $validator = Validator::make($body, [
+            'username' => 'required|string|min:6|max:18',
+            'password' => 'required|string|min:6|max:50',
+            'full_name' => 'required|string',
+            'email' => 'required|email',
+            'phone_number' => 'required'
         ]);
-    }
 
-    /**
-     * Create a new user instance after a valid registration.
-     *
-     * @param  array  $data
-     * @return \App\Models\User
-     */
-    protected function create(array $data)
-    {
-        return User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
+        if ($validator->fails()) {
+            $response['status'] = 0;
+            $response['message'] = 'Please fill the form!';
+            $code = 400;
+        } else {
+            DB::beginTransaction();
+            $params['username'] = $body['username'];
+            $params['password'] = bcrypt($body['password']);
+            $params['full_name'] = $body['full_name'];
+            $params['email'] = $body['email'];
+            $params['phone_number'] = $body['phone_number'];
+            $params['token'] = null;
+            $params['is_login'] = false;
+
+            $qSelectZ = XUsers::select('username')->where('username', $params['username'])->get();
+            if ($qSelectZ->count() > 0) {
+                $response['status'] = 0;
+                $response['message'] = 'Username is already exists!';
+                $code = 400;
+            } else {
+                try {
+                    XUsers::create($params);
+                    $response['status'] = 1;
+                    $response['message'] = 'User created!';
+                    $code = 200;
+                } catch (Exception $e) {
+                    $response['status'] = 0;
+                    $response['message'] = 'Server Error!';
+                    $code = 500;
+                }
+            }
+        }
+
+        if($response['status'] == 1){
+            DB::commit();
+        }else{
+            DB::rollBack();
+        }
+
+        return response()->json($response, $code);
     }
 }

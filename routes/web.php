@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MahasiswaController;
 
 
 Route::get('/home', 'HomeController@index');
@@ -41,3 +42,10 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 Route::get('/dashboard', function () {
     return view('petugas/dashboard');
 });
+
+Route::get('/mahasiswa', [MahasiswaController::class, 'index'])->name('mahasiswa.index');
+
+
+Route::middleware(['auth'])->group(function () {
+    // Rute yang memerlukan otentikasi
+    });
